@@ -1,0 +1,204 @@
+--Create a sample query(with limit 3 rows joining 3 tables together correctly)
+  SELECT
+    primary_name,
+    COUNT(DISTINCT primary_title) cnt_movies
+  FROM
+    `ajs-project-369413.imdb.title_basics` tb
+  LEFT JOIN
+    `ajs-project-369413.imdb.title_principals` tp
+  ON
+    tb.tconst=tp.tconst
+  LEFT JOIN
+    `ajs-project-369413.imdb.name_basics` nb
+  ON
+    nb.nconst=tp.nconst
+  WHERE
+    title_type='movie'AND category='actor' AND is_adult = 0
+  GROUP BY
+    1
+  HAVING
+    cnt_movies > 200
+  ORDER BY
+    2 DESC
+
+/* Q1,What is the movie with the highest averange_rating of the year 2022
+    -in case of same average_rating give the one with more num_votes
+    -with more than 100,000 num_votes?*/
+  --Answer: Severance
+  SELECT original_title,start_year,average_rating,num_votes
+  FROM `ajs-project-369413.imdb.title_basics` tb
+  LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr
+  ON tr.tconst = tb.tconst
+  WHERE start_year = 2022 AND num_votes > 100000 AND title_type = 'movie'
+  ORDER BY 3 DESC,4 DESC
+
+/* Q2,In order to have 1 metric to find the best movies, we will use average_rating *
+    num_votes that we will call rating_score - What are the top 5 movies with the 
+    highest rating_score ever?*/
+  --Answer:1,The Shwashank Redemption
+  --2,The Dark Knight
+  --3,Inception
+  --4,Game of Thrones
+  --5,Fight Club
+  SELECT original_title, average_rating, num_votes, average_rating*num_votes as rating_score
+  FROM `ajs-project-369413.imdb.title_basics` tb
+  LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr
+  ON tr.tconst = tb.tconst
+  WHERE title_type = 'movie'
+  ORDER BY rating_score DESC
+  LIMIT 5
+
+/* Q3,Get a query to have for each year, the number of movies released, the highest 
+    rating_score for the year and the average of average_rating for the year as well 
+    as the sum of num_votes - order by year descending*/
+  SELECT 
+    start_year,
+    COUNT(DISTINCT tb.tconst) as nb_movies_released,
+    MAX(average_rating*num_votes) as max_rating_score,
+    AVG(average_rating*num_votes) as avg_rating,
+    SUM(num_votes) as sum_num_votes
+  FROM `ajs-project-369413.imdb.title_ratings` tr
+  LEFT JOIN `ajs-project-369413.imdb.title_basics` tb
+  ON tr.tconst = tb.tconst
+  WHERE title_type = 'movie'
+  GROUP BY 1
+  ORDER BY 1 DESC
+
+/* Q4,Who is the actor who played in movies that has the biggest sum of 
+    rating_score - provide also his average of average_rating and his number 
+    of movies ??*/
+  --Answer:John Williams
+  SELECT
+    primary_name,
+    SUM(average_rating*num_votes) as sum_ratingscore,
+    AVG(average_rating*num_votes) as avg_rating,
+    COUNT(tp.tconst) as nb_movies
+  FROM `ajs-project-369413.imdb.title_principals` tp
+  LEFT JOIN `ajs-project-369413.imdb.name_basics` nb
+    ON tp.nconst = nb.nconst
+  LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr
+    ON tp.tconst = tr.tconst
+  WHERE category = 'actor'
+  GROUP BY 1
+  ORDER BY 2 DESC
+
+/* Q5,What are the top 3 movies with highest rating_score for the actor found above*/
+  --Answer:1,Schindler's List
+  --2,Saving Private Ryan
+  --3,Star Wars: Episode IV - A New H
+  SELECT
+    primary_title, 
+    average_rating*num_votes as rating_score
+  FROM `ajs-project-369413.imdb.title_principals` tp
+  LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr
+    ON tp.tconst = tr.tconst
+  LEFT JOIN `ajs-project-369413.imdb.title_basics` tb
+    ON tp.tconst = tb.tconst 
+  LEFT JOIN `ajs-project-369413.imdb.name_basics` nb
+    ON tp.nconst = nb.nconst 
+  WHERE nb.primary_name = 'Brad Pitt' AND category = 'actor'
+  ORDER BY 2 DESC
+  LIMIT 3
+/* Q6,Who is the actor who played in at least 5 movies with the highest 
+    average rating_score per movie (what is his average rating_score )?*/
+  --Answer:Ross Grayson Bell
+  SELECT
+    primary_name,
+    COUNT(DISTINCT tp.tconst) as nb_movies,
+    AVG(average_rating*num_votes) as avg_rating_score,
+    SUM(average_rating*num_votes) as sum_rating_score
+  FROM `ajs-project-369413.imdb.title_principals` tp
+  LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr
+    ON tp.tconst = tr.tconst
+  LEFT JOIN `ajs-project-369413.imdb.name_basics` nb
+    ON tp.nconst = nb.nconst
+  WHERE category = 'actor'
+  GROUP BY 1
+  HAVING nb_movies >= 5
+  ORDER BY 3 DESC,4 DESC
+
+/* Q7,Create a Query to get the top movie (highest rating_score) for each year*/
+  SELECT
+    sub1.start_year,
+    sub1.max_rating_score,
+    sub2.primary_title
+  FROM       
+      ( SELECT 
+        start_year,
+        MAX(average_rating*num_votes) as max_rating_score
+      FROM `ajs-project-369413.imdb.title_basics` tb1
+      LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr1
+      ON tr1.tconst = tb1.tconst
+      WHERE start_year <= 2022
+      GROUP BY 1
+      ORDER BY 1 DESC) sub1
+    LEFT JOIN 
+      ( SELECT 
+        primary_title,
+        MAX(average_rating*num_votes) as max_rating_score1
+      FROM  `ajs-project-369413.imdb.title_basics` tb2
+      LEFT JOIN `ajs-project-369413.imdb.title_ratings` tr2
+        ON tb2.tconst = tr2.tconst
+      GROUP BY 1
+      HAVING max_rating_score1 IS NOT NULL
+      ORDER BY 2 DESC) sub2
+      
+      ON sub1.max_rating_score = sub2.max_rating_score1 
+  ORDER BY 1 DESC
+
+/* Q8a,For each Movie Genre, for the release since 2000, give the movie title 
+    with the highest rating_score*/
+  --Answer:too much to write here
+    SELECT
+      sub1.genres,
+      sub2.primary_title,
+      sub1.max_rating_score
+    FROM 
+       (SELECT
+          genres,
+          MAX(average_rating * num_votes) as max_rating_score
+        FROM `ajs-project-369413.imdb.title_ratings` tr
+        LEFT JOIN `ajs-project-369413.imdb.title_basics` tb
+          ON tr.tconst = tb.tconst
+        WHERE
+          title_type ='movie'
+          AND start_year >= 2000
+          AND genres IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1) sub1
+    LEFT JOIN 
+        (SELECT
+          primary_title,
+          MAX(average_rating * num_votes) as max_rating_scroe1
+        FROM `ajs-project-369413.imdb.title_ratings` tr
+        LEFT JOIN `ajs-project-369413.imdb.title_basics` tb
+          ON tr.tconst = tb.tconst
+        WHERE
+          title_type ='movie'
+          AND start_year >= 2000
+        GROUP BY 1
+        ORDER BY 2 DESC) sub2
+      ON sub1.max_rating_score = sub2.max_rating_scroe1
+    ORDER BY 1
+
+/* Q8b,Duo? Find the actors duo that get the highest average rating_score per movie 
+    together in ordering 1 or 2, with at least 4 movies together*/
+  SELECT
+  FROM
+    (SELECT
+      sub1.tconst,
+      nb1.primary_name
+    FROM
+      (SELECT 
+        tconst,
+        COUNT(DISTINCT nconst) nb_cha
+      FROM `ajs-project-369413.imdb.title_principals` tp1
+      GROUP BY 1
+      HAVING nb_cha = 2
+      ORDER BY 2) sub1--find which movie have duo
+    LEFT JOIN `ajs-project-369413.imdb.title_principals` tp2
+      ON sub1.tconst = tp2.tconst
+    LEFT JOIN `ajs-project-369413.imdb.name_basics` nb1
+      ON tp2.nconst = nb1.nconst
+    ORDER BY 1) sub2--find the duo's name for each movie
+
